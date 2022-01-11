@@ -1,6 +1,8 @@
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter;
 import com.hivemq.client.mqtt.datatypes.MqttQos;
 import com.hivemq.client.mqtt.mqtt5.Mqtt5BlockingClient;
+import com.hivemq.client.mqtt.mqtt5.message.publish.Mqtt5Publish;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import static org.awaitility.Awaitility.await;
@@ -12,25 +14,55 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ClientExamplesTest {
+    final static String sendTopic = "ping";
+    final static String receiveTopic = "pong";
+    final static String host="thinkstation";
 
     @Test
-    public void testPublishMessage() {
+    public void testPublishLargeMessage() throws InterruptedException {
+        final byte[] largePayload = RandomStringUtils.randomAscii(2048*512).getBytes(StandardCharsets.UTF_8);
+
         Mqtt5BlockingClient client = Mqtt5Client.builder()
                 .identifier(UUID.randomUUID().toString())
-                .serverHost("localhost")
+                .serverHost(host)
                 .buildBlocking();
 
         client.connect();
-        client.publishWith().topic("test/topic").qos(MqttQos.AT_LEAST_ONCE).payload("1".getBytes()).send();
+
+        final Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL);
+        client.subscribeWith().topicFilter(receiveTopic).send();
+
+        client.publishWith().topic(sendTopic).payload(largePayload).send();
+
+        @NotNull Mqtt5Publish largePackageReceived = publishes.receive();
+        assertArrayEquals( largePayload,largePackageReceived.getPayloadAsBytes());
+
         client.disconnect();
     }
+    @Test
+    public void testPublishSmallMessage() throws InterruptedException {
+        Mqtt5BlockingClient client = Mqtt5Client.builder()
+                .identifier(UUID.randomUUID().toString())
+                .serverHost(host)
+                .buildBlocking();
 
+        client.connect();
+
+        final Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL);
+        client.subscribeWith().topicFilter(receiveTopic).send();
+
+        client.publishWith().topic(sendTopic).payload("1".getBytes()).send();
+        @NotNull Mqtt5Publish smallPackageReceived = publishes.receive();
+        assertArrayEquals( "1".getBytes(),smallPackageReceived.getPayloadAsBytes());
+        System.out.println("Received small package");
+        client.disconnect();
+    }
     @Test
     public void testSubscribeMessage()  {
 
