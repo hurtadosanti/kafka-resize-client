@@ -19,14 +19,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ClientExamplesTest {
+public class MqttClientTest {
     final static String sendTopic = "ping";
     final static String receiveTopic = "pong";
-    final static String host="thinkstation";
+    final static String host="localhost";
 
     @Test
     public void testPublishLargeMessage() throws InterruptedException {
+
         final byte[] largePayload = RandomStringUtils.randomAscii(2048*512).getBytes(StandardCharsets.UTF_8);
+
+        final int size = largePayload.length;
+        System.out.println("Message Size: "+size);
 
         Mqtt5BlockingClient client = Mqtt5Client.builder()
                 .identifier(UUID.randomUUID().toString())
@@ -37,12 +41,12 @@ public class ClientExamplesTest {
 
         final Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL);
         client.subscribeWith().topicFilter(receiveTopic).send();
-
+        System.out.println("Publishing message");
         client.publishWith().topic(sendTopic).payload(largePayload).send();
-
+        System.out.println("Message published");
         @NotNull Mqtt5Publish largePackageReceived = publishes.receive();
         assertArrayEquals( largePayload,largePackageReceived.getPayloadAsBytes());
-
+        System.out.println("Message received");
         client.disconnect();
     }
     @Test
