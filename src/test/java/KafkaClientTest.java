@@ -32,15 +32,15 @@ public class KafkaClientTest {
 
     @Test
     public void sendByteMessage() throws ExecutionException, InterruptedException {
-        SendMessageOfSize(512);
+        sendMessageOfSize(512);
     }
 
     @Test
     public void sendLargeByteMessage() throws ExecutionException, InterruptedException {
-        SendMessageOfSize(2048 * 1024);
+        sendMessageOfSize(2048 * 1024);
     }
 
-    private void SendMessageOfSize(int size) throws InterruptedException, ExecutionException {
+    private void sendMessageOfSize(int size)  {
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
         byte[] payload = RandomStringUtils.randomAscii(size).getBytes(StandardCharsets.UTF_8);
         final ProducerRecord<String, byte[]> record = new ProducerRecord<>(senderTopic, "key", payload);
