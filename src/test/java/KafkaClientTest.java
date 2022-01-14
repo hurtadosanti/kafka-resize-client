@@ -40,7 +40,7 @@ public class KafkaClientTest {
         SendMessageOfSize(2048 * 1024);
     }
 
-    private void SendMessageOfSize(int size) throws InterruptedException, ExecutionException {
+    private void SendMessageOfSize(int size)  {
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
         byte[] payload = RandomStringUtils.randomAscii(size).getBytes(StandardCharsets.UTF_8);
         final ProducerRecord<String, byte[]> record = new ProducerRecord<>(senderTopic, "key", payload);
