@@ -40,11 +40,35 @@ public class KafkaClientTest {
         sendMessageOfSize(2048 * 1024);
     }
 
-    private void sendMessageOfSize(int size)  {
+    private void sendMessageOfSize(int size) throws ExecutionException, InterruptedException {
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
         byte[] payload = RandomStringUtils.randomAscii(size).getBytes(StandardCharsets.UTF_8);
-        final ProducerRecord<String, byte[]> record = new ProducerRecord<>(senderTopic, "key", payload);
         AtomicBoolean sent = new AtomicBoolean(false);
+        Future<RecordMetadata> future = null;
+        try {
+            future = sendMessage(producer,payload,sent);
+        } catch (java.util.concurrent.ExecutionException e) {
+            if(e.getCause() instanceof org.apache.kafka.common.errors.RecordTooLargeException){
+                RecordTooLargeException recordInfo = ((RecordTooLargeException) e.getCause());
+                String message = recordInfo.getMessage();
+                producer.close();
+                properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG,String.valueOf(payload.length+256));
+                producer = new KafkaProducer<>(properties);
+                alterTopic();
+                future = sendMessage(producer,payload,sent);
+            }else{
+                log.error(e.getCause().getClass().getCanonicalName());
+            }
+
+        }catch (Exception e) {
+            log.error(e.getMessage());
+        }
+        assert future != null;
+        assertTrue(future.isDone());
+        assertTrue(sent.get());
+    }
+    private Future<RecordMetadata> sendMessage(KafkaProducer<String, byte[]> producer, byte[] payload, AtomicBoolean sent) throws ExecutionException, InterruptedException {
+        final ProducerRecord<String, byte[]> record = new ProducerRecord<>(senderTopic, "key", payload);
         Future<RecordMetadata> future = producer.send(record, (m, e) -> {
             if (e != null) {
                 log.debug("Send failed for record {}", record, e);
@@ -53,22 +77,8 @@ public class KafkaClientTest {
                 sent.set(true);
             }
         });
-        try {
-            future.get();
-        } catch (java.util.concurrent.ExecutionException e) {
-            if(e.getCause() instanceof org.apache.kafka.common.errors.RecordTooLargeException){
-                RecordTooLargeException recordInfo = ((RecordTooLargeException) e.getCause());
-                String message = recordInfo.getMessage();
-
-            }else{
-                log.error(e.getCause().getClass().getCanonicalName());
-            }
-
-        }catch (Exception e) {
-            log.error(e.getMessage());
-        }
-        assertTrue(future.isDone());
-        assertTrue(sent.get());
+        future.get();
+        return future;
     }
 
     @NotNull
@@ -109,6 +119,7 @@ public class KafkaClientTest {
         KafkaFuture<Void> alterFuture = adminClient.incrementalAlterConfigs(configs).all();
         //final NewTopic newTopic = new NewTopic(senderTopic, Optional.empty(), Optional.empty());
         alterFuture.get();
+
         assertTrue(alterFuture.isDone());
 
     }
