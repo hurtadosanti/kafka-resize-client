@@ -1,4 +1,4 @@
-# hivemq-client-examples
+# Resize kafka producer size on the fly
 
 Commands to run the samples
 
