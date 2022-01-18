@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class KafkaClientTest {
     final String senderTopic = "test";
+    final int messageSize = 1024 * 1024 * 124;
     private static final Logger log = LoggerFactory.getLogger(KafkaClientTest.class);
     private final Properties properties;
 
@@ -43,15 +44,14 @@ public class KafkaClientTest {
 
     @Test
     public void sendLargeByteMessage() throws ExecutionException, InterruptedException {
-        sendMessageOfSize(1024 * 1024 * 199);
+        sendMessageOfSize(messageSize);
     }
 
     @Test
     public void receiveMessage() {
-        int size = 1024*1024*256;
         Properties props = properties;
-        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG,String.valueOf(size) );
-        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,String.valueOf(size) );
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG,String.valueOf(messageSize) );
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,String.valueOf(messageSize) );
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(senderTopic));
         AtomicInteger counter = new AtomicInteger();
@@ -80,10 +80,11 @@ public class KafkaClientTest {
     }
 
     private void sendMessageOfSize(int size) throws ExecutionException, InterruptedException {
+        System.out.println("Message Size to be send:"+size);
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
         AtomicBoolean sent = new AtomicBoolean(false);
         ProducerRecord<String, byte[]> record = getRecord(size);
-        int messageSize = size + 128;
+        int sendMessageSize = size + 128;
         Future<RecordMetadata> future = null;
         try {
             future = sendMessage(producer, record, sent);
@@ -92,11 +93,11 @@ public class KafkaClientTest {
                 RecordTooLargeException recordInfo = ((RecordTooLargeException) e.getCause());
                 String message = recordInfo.getMessage();
                 producer.close();
-                properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(messageSize));
-                properties.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(messageSize));
+                properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(sendMessageSize));
+                properties.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(sendMessageSize));
                 properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG,String.valueOf(64));
                 producer = new KafkaProducer<>(properties);
-                alterTopic(messageSize);
+                alterTopic(sendMessageSize);
                 future = sendMessage(producer, record, sent);
             } else {
                 log.error(e.getCause().getClass().getCanonicalName());
@@ -152,7 +153,7 @@ public class KafkaClientTest {
 
     @Test
     public void alterTopic() throws ExecutionException, InterruptedException {
-        alterTopic(1024 * 1024 * 128);
+        alterTopic(messageSize);
 
     }
 
