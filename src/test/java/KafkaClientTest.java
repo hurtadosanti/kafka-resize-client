@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
@@ -42,44 +43,61 @@ public class KafkaClientTest {
 
     @Test
     public void sendLargeByteMessage() throws ExecutionException, InterruptedException {
-        sendMessageOfSize(2048 * 1024);
+        sendMessageOfSize(1024 * 1024 * 199);
     }
 
     @Test
     public void receiveMessage() {
-        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
+        int size = 1024*1024*256;
+        Properties props = properties;
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG,String.valueOf(size) );
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,String.valueOf(size) );
+        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(senderTopic));
         AtomicInteger counter = new AtomicInteger();
-        while (counter.get() <10) {
+        while (counter.get() < 10) {
             ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(100));
 
             if (records.count() > 0) {
                 records.forEach(record -> {
                     counter.getAndIncrement();
-                    String s = new String(record.value(), StandardCharsets.UTF_8);
-                    System.out.println(record.key()+"-"+ record.value().length);
+                    //String s = new String(record.value(), StandardCharsets.UTF_8);
+                    System.out.println(record.key() + "-" + record.value().length);
                 });
             }
         }
         //consumer.close();
     }
 
+    private ProducerRecord<String, byte[]> getRecord(int size) {
+        String largeString = RandomStringUtils.randomAscii(size / 4);
+        ByteBuffer buffer = ByteBuffer.allocate(size);
+        buffer.put(largeString.getBytes(StandardCharsets.UTF_8));
+        buffer.put(largeString.getBytes(StandardCharsets.UTF_8));
+        buffer.put(largeString.getBytes(StandardCharsets.UTF_8));
+        buffer.put(largeString.getBytes(StandardCharsets.UTF_8));
+        return new ProducerRecord<>(senderTopic, "key", buffer.array());
+    }
+
     private void sendMessageOfSize(int size) throws ExecutionException, InterruptedException {
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
-        byte[] payload = ("start - "+RandomStringUtils.randomAscii(size)+" - end").getBytes(StandardCharsets.UTF_8);
         AtomicBoolean sent = new AtomicBoolean(false);
+        ProducerRecord<String, byte[]> record = getRecord(size);
+        int messageSize = size + 128;
         Future<RecordMetadata> future = null;
         try {
-            future = sendMessage(producer, payload, sent);
+            future = sendMessage(producer, record, sent);
         } catch (java.util.concurrent.ExecutionException e) {
             if (e.getCause() instanceof org.apache.kafka.common.errors.RecordTooLargeException) {
                 RecordTooLargeException recordInfo = ((RecordTooLargeException) e.getCause());
                 String message = recordInfo.getMessage();
                 producer.close();
-                properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(payload.length + 256));
+                properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(messageSize));
+                properties.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(messageSize));
+                properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG,String.valueOf(64));
                 producer = new KafkaProducer<>(properties);
-                alterTopic();
-                future = sendMessage(producer, payload, sent);
+                alterTopic(messageSize);
+                future = sendMessage(producer, record, sent);
             } else {
                 log.error(e.getCause().getClass().getCanonicalName());
             }
@@ -92,11 +110,11 @@ public class KafkaClientTest {
         assertTrue(sent.get());
     }
 
-    private Future<RecordMetadata> sendMessage(KafkaProducer<String, byte[]> producer, byte[] payload, AtomicBoolean sent) throws ExecutionException, InterruptedException {
-        final ProducerRecord<String, byte[]> record = new ProducerRecord<>(senderTopic, "key", payload);
+    private Future<RecordMetadata> sendMessage(KafkaProducer<String, byte[]> producer, ProducerRecord<String, byte[]> record, AtomicBoolean sent) throws ExecutionException, InterruptedException {
         Future<RecordMetadata> future = producer.send(record, (m, e) -> {
             if (e != null) {
-                log.debug("Send failed for record {}", record, e);
+                System.out.println("Send failed for record " + e.getMessage());
+                sent.set(false);
             } else {
                 System.out.printf("Produced record to topic %s partition [%d] @ offset %d%n", m.topic(), m.partition(), m.offset());
                 sent.set(true);
@@ -111,11 +129,9 @@ public class KafkaClientTest {
         Properties config = new Properties();
         config.put("client.id", InetAddress.getLocalHost().getHostName());
         config.put("bootstrap.servers", "localhost:19092");
-        //config.put(ProducerConfig.ACKS_CONFIG, "all");
-
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "01");
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringSerializer");
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArraySerializer");
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, "01");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.StringDeserializer");
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         return config;
@@ -136,20 +152,32 @@ public class KafkaClientTest {
 
     @Test
     public void alterTopic() throws ExecutionException, InterruptedException {
+        alterTopic(1024 * 1024 * 128);
 
+    }
+
+    private void alterTopic(int size) throws InterruptedException, ExecutionException {
+        String messageSize = String.valueOf(size);
         final AdminClient adminClient = AdminClient.create(properties);
 
         ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, senderTopic);
-        ConfigEntry entry = new ConfigEntry(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, String.valueOf(2048 * 2048));
-        AlterConfigOp op = new AlterConfigOp(entry, AlterConfigOp.OpType.SET);
+        ConfigEntry maxMessageBytes = new ConfigEntry(TopicConfig.MAX_MESSAGE_BYTES_CONFIG, messageSize);
+        ConfigEntry entry = new ConfigEntry(TopicConfig.SEGMENT_BYTES_CONFIG, messageSize);
 
-        Map<ConfigResource, Collection<AlterConfigOp>> configs = new HashMap<>(1);
-        configs.put(configResource, List.of(op));
+        List<AlterConfigOp> ops = new ArrayList<>(2);
+        AlterConfigOp op = new AlterConfigOp(entry, AlterConfigOp.OpType.SET);
+        ops.add(op);
+        AlterConfigOp op_max_message = new AlterConfigOp(maxMessageBytes, AlterConfigOp.OpType.SET);
+        ops.add(op_max_message);
+
+
+        Map<ConfigResource, Collection<AlterConfigOp>> configs = new HashMap<>(2);
+        configs.put(configResource, ops);
+
         KafkaFuture<Void> alterFuture = adminClient.incrementalAlterConfigs(configs).all();
         //final NewTopic newTopic = new NewTopic(senderTopic, Optional.empty(), Optional.empty());
         alterFuture.get();
 
         assertTrue(alterFuture.isDone());
-
     }
 }
