@@ -50,8 +50,8 @@ public class KafkaClientTest {
     @Test
     public void receiveMessage() {
         Properties props = properties;
-        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG,String.valueOf(messageSize) );
-        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG,String.valueOf(messageSize) );
+        props.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, String.valueOf(messageSize));
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, String.valueOf(messageSize));
         KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList(senderTopic));
         AtomicInteger counter = new AtomicInteger();
@@ -80,7 +80,7 @@ public class KafkaClientTest {
     }
 
     private void sendMessageOfSize(int size) throws ExecutionException, InterruptedException {
-        System.out.println("Message Size to be send:"+size);
+        System.out.println("Message Size to be send:" + size);
         KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties);
         AtomicBoolean sent = new AtomicBoolean(false);
         ProducerRecord<String, byte[]> record = getRecord(size);
@@ -95,7 +95,7 @@ public class KafkaClientTest {
                 producer.close();
                 properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(sendMessageSize));
                 properties.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(sendMessageSize));
-                properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG,String.valueOf(64));
+                properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, String.valueOf(64));
                 producer = new KafkaProducer<>(properties);
                 alterTopic(sendMessageSize);
                 future = sendMessage(producer, record, sent);
@@ -154,6 +154,20 @@ public class KafkaClientTest {
     @Test
     public void alterTopic() throws ExecutionException, InterruptedException {
         alterTopic(messageSize);
+
+    }
+
+    @Test
+    public void describeTopic() throws ExecutionException, InterruptedException {
+        final AdminClient adminClient = AdminClient.create(properties);
+        ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, senderTopic);
+        DescribeConfigsResult resource = adminClient.describeConfigs(Collections.singleton(configResource));
+        resource.all().get().forEach((a,b)->{
+            System.out.println("Resource type: "+a.type()+" of name: "+a.name());
+            b.entries().forEach(e->{
+                System.out.println("\t"+e.name()+":"+e.value());
+            });
+        });
 
     }
 
