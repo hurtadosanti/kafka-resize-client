@@ -1,5 +1,7 @@
 # Resize kafka producer size on the fly
 
+[![Qodana](https://github.com/hurtadosanti/kafka-resize-client/actions/workflows/code_quality.yml/badge.svg)](https://github.com/hurtadosanti/kafka-resize-client/actions/workflows/code_quality.yml)
+
 Commands to run the samples
 
 ```shell
