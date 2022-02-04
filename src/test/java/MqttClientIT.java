@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 import static org.awaitility.Awaitility.await;
 
 import com.hivemq.client.mqtt.mqtt5.Mqtt5Client;
+import org.junit.jupiter.api.Timeout;
 
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -18,12 +18,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MqttClientTest {
+public class MqttClientIT {
     final static String sendTopic = "ping";
     final static String receiveTopic = "pong";
     final static String host="localhost";
@@ -89,6 +88,7 @@ public class MqttClientTest {
         client.disconnect();
     }
     @Test
+    @Timeout(value = 100,unit = TimeUnit.MILLISECONDS)
     public void testSubscribeMessage()  {
 
         AtomicBoolean received = new AtomicBoolean(false);

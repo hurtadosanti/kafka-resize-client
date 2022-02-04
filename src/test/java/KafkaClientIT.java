@@ -28,13 +28,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class KafkaClientTest {
+public class KafkaClientIT {
     final String senderTopic = "test";
     final int messageSize = 1024 * 1024 * 124;
-    private static final Logger log = LoggerFactory.getLogger(KafkaClientTest.class);
+    private static final Logger log = LoggerFactory.getLogger(KafkaClientIT.class);
     private final Properties properties;
 
-    KafkaClientTest() throws UnknownHostException {
+    KafkaClientIT() throws UnknownHostException {
         properties = getProperties();
     }
 
