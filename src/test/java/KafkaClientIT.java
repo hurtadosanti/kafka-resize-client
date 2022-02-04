@@ -29,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class KafkaClientIT {
-    final String senderTopic = "test";
+    final @NotNull String senderTopic = "test";
     final int messageSize = 1024 * 1024 * 124;
-    private static final Logger log = LoggerFactory.getLogger(KafkaClientIT.class);
-    private final Properties properties;
+    private static final @NotNull Logger log = LoggerFactory.getLogger(KafkaClientIT.class);
+    private final @NotNull Properties properties;
 
     KafkaClientIT() throws UnknownHostException {
         properties = getProperties();
@@ -177,7 +177,6 @@ public class KafkaClientIT {
                         System.out.println("Instance of ");
                     }else{
                         System.out.println("resource exception: " + configResource.name() + "-" + throwable.getClass().getCanonicalName());
-
                     }
                 } else {
                     list.add(configResource.name());
