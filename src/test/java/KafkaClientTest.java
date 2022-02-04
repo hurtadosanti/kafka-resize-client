@@ -9,6 +9,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.apache.kafka.common.errors.TopicExistsException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -20,11 +21,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class KafkaClientTest {
@@ -95,7 +96,6 @@ public class KafkaClientTest {
                 producer.close();
                 properties.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, String.valueOf(sendMessageSize));
                 properties.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, String.valueOf(sendMessageSize));
-                properties.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, String.valueOf(64));
                 producer = new KafkaProducer<>(properties);
                 alterTopic(sendMessageSize);
                 future = sendMessage(producer, record, sent);
@@ -158,18 +158,43 @@ public class KafkaClientTest {
     }
 
     @Test
-    public void describeTopic() throws ExecutionException, InterruptedException {
+    public void describeTopic() throws InterruptedException, ExecutionException {
         final AdminClient adminClient = AdminClient.create(properties);
-        ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, senderTopic);
-        DescribeConfigsResult resource = adminClient.describeConfigs(Collections.singleton(configResource));
-        resource.all().get().forEach((a,b)->{
-            System.out.println("Resource type: "+a.type()+" of name: "+a.name());
-            b.entries().forEach(e->{
-                System.out.println("\t"+e.name()+":"+e.value());
+        List<ConfigResource> configResources = new ArrayList<>();
+
+        configResources.add(new ConfigResource(ConfigResource.Type.TOPIC, senderTopic));
+        configResources.add(new ConfigResource(ConfigResource.Type.TOPIC, senderTopic + "-none"));
+
+        final AtomicInteger done = new AtomicInteger(configResources.size());
+        final CompletableFuture<Void> allOfFuture = new CompletableFuture<>();
+        final ConcurrentLinkedDeque<String> list = new ConcurrentLinkedDeque<String>();
+
+        DescribeConfigsResult resources = adminClient.describeConfigs(configResources);
+        resources.values().forEach((configResource, configKafkaFuture) -> {
+            configKafkaFuture.whenComplete((config, throwable) -> {
+                if (throwable != null) {
+                    if(throwable instanceof UnknownTopicOrPartitionException){
+                        System.out.println("Instance of ");
+                    }else{
+                        System.out.println("resource exception: " + configResource.name() + "-" + throwable.getClass().getCanonicalName());
+
+                    }
+                } else {
+                    list.add(configResource.name());
+                    config.entries().forEach(configEntry -> {
+                                System.out.println(configEntry.name()+"|"+configEntry.value());
+                            }
+                    );
+                }
+                if (done.decrementAndGet() == 0) {
+                    allOfFuture.complete(null);
+                }
             });
         });
-
+        allOfFuture.get();
+        assertEquals(1,list.size());
     }
+
 
     private void alterTopic(int size) throws InterruptedException, ExecutionException {
         String messageSize = String.valueOf(size);

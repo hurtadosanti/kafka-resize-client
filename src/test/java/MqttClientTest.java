@@ -9,6 +9,7 @@ import static org.awaitility.Awaitility.await;
 
 import com.hivemq.client.mqtt.mqtt5.Mqtt5Client;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
@@ -16,6 +17,9 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,27 +31,44 @@ public class MqttClientTest {
     @Test
     public void testPublishLargeMessage() throws InterruptedException {
 
-        final byte[] largePayload = RandomStringUtils.randomAscii(2048*512).getBytes(StandardCharsets.UTF_8);
+        final byte[] largePayload = RandomStringUtils.randomAscii(1024*1024).getBytes(StandardCharsets.UTF_8);
 
         final int size = largePayload.length;
         System.out.println("Message Size: "+size);
-
         Mqtt5BlockingClient client = Mqtt5Client.builder()
                 .identifier(UUID.randomUUID().toString())
                 .serverHost(host)
                 .buildBlocking();
 
         client.connect();
-
         final Mqtt5BlockingClient.Mqtt5Publishes publishes = client.publishes(MqttGlobalPublishFilter.ALL);
-        client.subscribeWith().topicFilter(receiveTopic).send();
+
         System.out.println("Publishing message");
-        client.publishWith().topic(sendTopic).payload(largePayload).send();
-        System.out.println("Message published");
+        Executors.newCachedThreadPool().submit(()->{
+            sendLargeMessage(largePayload);
+            sendLargeMessage(largePayload);
+            sendLargeMessage(largePayload);
+            sendLargeMessage(largePayload);
+
+        });
+
+
         @NotNull Mqtt5Publish largePackageReceived = publishes.receive();
         assertArrayEquals( largePayload,largePackageReceived.getPayloadAsBytes());
         System.out.println("Message received");
+
+    }
+    private void sendLargeMessage(byte[] payload){
+        Mqtt5BlockingClient client = Mqtt5Client.builder()
+                .identifier(UUID.randomUUID().toString())
+                .serverHost(host)
+                .buildBlocking();
+
+        client.connect();
+        client.subscribeWith().topicFilter(receiveTopic).send();
+        client.publishWith().topic(sendTopic).payload(payload).send();
         client.disconnect();
+        System.out.println("Message published");
     }
     @Test
     public void testPublishSmallMessage() throws InterruptedException {
@@ -103,3 +124,4 @@ public class MqttClientTest {
         assertTrue(received.get());
     }
 }
+

@@ -1,6 +1,6 @@
 version: '3.5'
 networks:
-  rmoff_kafka:
+  network:
     name: rmoff_kafka
 
 services:
@@ -9,6 +9,8 @@ services:
     container_name: hivemq
     ports:
       - "1883:1883"
+      - "8000:8000"
+      - "8800:8080"
     volumes:
       - ./data/extensions:/opt/hivemq-4.7.3/extensions
       - ./data/license:/opt/hivemq-4.7.3/license
@@ -16,14 +18,14 @@ services:
       - broker
       - kafka-ui
     networks:
-      - rmoff_kafka
+      - network
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     networks:
-      - rmoff_kafka
+      - network
 
   broker:
     image: confluentinc/cp-kafka:6.2.0
@@ -42,12 +44,12 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_SOCKET_REQUEST_MAX_BYTES: 130023552
     networks:
-      - rmoff_kafka
+      - network
   kafka-ui:
     image: provectuslabs/kafka-ui
     container_name: kafka-ui
     ports:
-      - "8080:8080"
+      - "8008:8080"
     restart: always
     environment:
       - KAFKA_CLUSTERS_0_NAME=local
@@ -56,4 +58,4 @@ services:
     depends_on:
       - broker
     networks:
-      - rmoff_kafka
+      - network
