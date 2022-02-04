@@ -2,6 +2,7 @@ name: Qodana
 on:
   workflow_dispatch:
   pull_request:
+    types: [closed]
   push:
     branches:
       - main
@@ -10,6 +11,7 @@ on:
 jobs:
   qodana:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
       - uses: actions/checkout@v2
       - name: 'Qodana Scan'
@@ -19,3 +21,4 @@ jobs:
       - uses: github/codeql-action/upload-sarif@v1
         with:
           sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
+      - uses: JetBrains/qodana-clone-finder-action@v2.0-eap
