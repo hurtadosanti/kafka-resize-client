@@ -9,9 +9,9 @@ services:
     container_name: hivemq
     ports:
       - "1883:1883"
-      - "8000:8000"
       - "8800:8080"
     volumes:
+      - ./data/configurations/broker-configuration.xml:/opt/hivemq/conf/config.xml
       - ./data/extensions:/opt/hivemq-4.7.3/extensions
       - ./data/license:/opt/hivemq-4.7.3/license
     depends_on:

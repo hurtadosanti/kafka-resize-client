@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<kafka-configuration>
+    <kafka-clusters>
+        <kafka-cluster>
+            <id>cluster01</id>
+            <bootstrap-servers>broker:9092</bootstrap-servers>
+        </kafka-cluster>
+    </kafka-clusters>
+    <mqtt-to-kafka-mappings>
+        <mqtt-to-kafka-mapping>
+            <id>mqtt-to-kafka-mapping-1</id>
+            <cluster-id>cluster01</cluster-id>
+            <mqtt-topic-filters>
+                <mqtt-topic-filter>ping</mqtt-topic-filter>
+            </mqtt-topic-filters>
+            <kafka-topic>test</kafka-topic>
+        </mqtt-to-kafka-mapping>
+    </mqtt-to-kafka-mappings>
+    <kafka-to-mqtt-mappings>
+        <kafka-to-mqtt-mapping>
+            <id>kafka-to-mqtt-mapping-1</id>
+            <cluster-id>cluster01</cluster-id>
+            <kafka-topics>
+                <kafka-topic>test</kafka-topic>
+            </kafka-topics>
+            <mqtt-topics>
+                <mqtt-topic>pong</mqtt-topic>
+            </mqtt-topics>
+        </kafka-to-mqtt-mapping>
+    </kafka-to-mqtt-mappings>
+</kafka-configuration>
