@@ -15,8 +15,7 @@ services:
       - ./data/extensions:/opt/hivemq-4.7.3/extensions
       - ./data/license:/opt/hivemq-4.7.3/license
     depends_on:
-      - broker
-      - kafka-ui
+      - kafka
     networks:
       - network
   zookeeper:
@@ -27,7 +26,7 @@ services:
     networks:
       - network
 
-  broker:
+  kafka:
     image: confluentinc/cp-kafka:6.2.0
     container_name: broker
     ports:
@@ -56,6 +55,6 @@ services:
       - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=broker:9092
       - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
     depends_on:
-      - broker
+      - kafka
     networks:
       - network
